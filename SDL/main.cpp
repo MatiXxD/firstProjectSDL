@@ -190,6 +190,8 @@ int main(int argc, char* argv[]) {
 
 	}
 
+	// test 
+
 	// Destroying textures
 	for (int i = 0; i < PLAYER_FRAMES; i++) 
 		SDL_DestroyTexture(gameState.playerFrames[i]);
