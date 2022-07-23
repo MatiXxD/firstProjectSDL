@@ -137,8 +137,8 @@ void loadGame(GameState* gameState) {
 		loadTexture(&gameState->enemyFrames[i], gameState->renderer, enemyFiles[i]);
 	loadTexture(&gameState->brickTexture, gameState->renderer, "Textures/Brick.png");
 
-	gameState->player.x = 840;
-	gameState->player.y = 480;
+	gameState->player.x = 0;
+	gameState->player.y = 920;
 
 	// Init enemies
 	for (int i = 0; i < ENEMIES_COUNT; i++) {
@@ -155,6 +155,47 @@ void loadGame(GameState* gameState) {
 	}
 	gameState->bricks[BRICKS_COUNT - 1].x = 350;
 	gameState->bricks[BRICKS_COUNT - 1].y = 700;
+
+}
+
+void collisionDetect(GameState* gameState) {
+
+	for (int i = 0; i < BRICKS_COUNT; i++) {
+
+		float pw = 64, ph = 80;
+		float px = gameState->player.x, py = gameState->player.y;
+		float bw = gameState->bricks[i].w, bh = gameState->bricks[i].h;
+		float bx = gameState->bricks[i].x, by = gameState->bricks[i].y;
+
+		// Check for collisions in brick range
+		if (py + ph > by && py < by + bh) {	
+
+			if (px < bx + bw && px + pw > bx + bw) {						// Right side of the brick 
+				gameState->player.x = bx + bw;
+				px = gameState->player.x;									// Need to change it for the next if statement 
+			}																
+			else if (px < bx && px + pw > bx) {								// Left side of the brick 
+				gameState->player.x = bx - pw;
+				px = gameState->player.x;
+			}
+
+		}
+
+		// Check for collisions upper/under brick range
+		if (px + pw > bx && px < bx + bw) {
+
+			if (py < by && py + ph > by) {									// Top side of the brick
+				gameState->player.y = by - ph;
+				gameState->player.dy = 0.0f;
+			}
+			else if (py < by + bh && py + ph > by + bh) {					// Bottom side of the brick
+				gameState->player.y = by + bh;
+				gameState->player.dy = 0.0f;
+			};
+
+		}
+
+	}
 
 }
 
@@ -184,13 +225,12 @@ int main(int argc, char* argv[]) {
 	while (!done) {
 
 		processEvents(window, &done, &gameState);
+		collisionDetect(&gameState);
 		doRender(renderer, &gameState);
 
 		//SDL_Delay(10);
 
 	}
-
-	// test 
 
 	// Destroying textures
 	for (int i = 0; i < PLAYER_FRAMES; i++) 
