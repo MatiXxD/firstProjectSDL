@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <time.h>
 #include <SDL.h>
 #include <SDL_image.h>
@@ -9,12 +10,15 @@
 #define ENEMIES_COUNT 20 
 #define BRICKS_COUNT 10
 
+#define GRAVITY 0.1f
 
 typedef struct{
 	float x, y;
-	float dy;
+	float dy, dx;
 	short hp;
 	char* name;
+	bool onBrick;
+	int flyTime;
 }Player;
 
 typedef struct {
@@ -61,6 +65,13 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 			case SDLK_ESCAPE:
 				*done = 1;
 				break;
+			case SDLK_w:
+				if (gameState->player.onBrick) {
+					gameState->player.dy = -5.0f;
+					gameState->player.flyTime = 0;
+					gameState->player.onBrick = false;
+				}
+				break;
 			}
 		} break;
 		case SDL_QUIT: {
@@ -70,10 +81,30 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 	}
 
 	const Uint8* state = SDL_GetKeyboardState(NULL);
-	if (state[SDL_SCANCODE_D]) gameState->player.x += 2.5f;
-	if (state[SDL_SCANCODE_A]) gameState->player.x -= 2.5f;
-	if (state[SDL_SCANCODE_W]) gameState->player.y -= 2.5f;
-	if (state[SDL_SCANCODE_S]) gameState->player.y += 2.5f;
+
+	// Extra jumping
+	if (state[SDL_SCANCODE_W] && gameState->player.flyTime < 50) {
+		gameState->player.dy -= 0.1f;
+		gameState->player.flyTime++;
+	}
+	
+
+	// Walking
+	if (state[SDL_SCANCODE_D]) {
+		gameState->player.dx += 0.5f;
+		if (gameState->player.dx > 3.0f)
+			gameState->player.dx = 3.0f;
+	}
+	else if (state[SDL_SCANCODE_A]) {
+		gameState->player.dx -= 0.5f;
+		if (gameState->player.dx < -3.0f)
+			gameState->player.dx = -3.0f;
+	}
+	else {
+		gameState->player.dx *= 0.8f;
+		if (fabsf(gameState->player.dx) < 0.1f)
+			gameState->player.dx = 0.0f;
+	}
 
 }
 
@@ -137,8 +168,13 @@ void loadGame(GameState* gameState) {
 		loadTexture(&gameState->enemyFrames[i], gameState->renderer, enemyFiles[i]);
 	loadTexture(&gameState->brickTexture, gameState->renderer, "Textures/Brick.png");
 
+	// Init player
 	gameState->player.x = 0;
 	gameState->player.y = 920;
+	gameState->player.dy = 0;
+	gameState->player.dx = 0;
+	gameState->player.onBrick = false;
+	gameState->player.flyTime = 0;
 
 	// Init enemies
 	for (int i = 0; i < ENEMIES_COUNT; i++) {
@@ -160,6 +196,7 @@ void loadGame(GameState* gameState) {
 
 void collisionDetect(GameState* gameState) {
 
+	// Should add corners check  
 	for (int i = 0; i < BRICKS_COUNT; i++) {
 
 		float pw = 64, ph = 80;
@@ -167,35 +204,57 @@ void collisionDetect(GameState* gameState) {
 		float bw = gameState->bricks[i].w, bh = gameState->bricks[i].h;
 		float bx = gameState->bricks[i].x, by = gameState->bricks[i].y;
 
-		// Check for collisions in brick range
-		if (py + ph > by && py < by + bh) {	
+		// Check for collisions with top/bot side of the brick
+		if (px + pw > bx && px < bx + bw) {
 
-			if (px < bx + bw && px + pw > bx + bw) {						// Right side of the brick 
-				gameState->player.x = bx + bw;
-				px = gameState->player.x;									// Need to change it for the next if statement 
-			}																
-			else if (px < bx && px + pw > bx) {								// Left side of the brick 
-				gameState->player.x = bx - pw;
-				px = gameState->player.x;
+			if (py < by + bh && py > by && gameState->player.dy < 0) {
+				// Correct player's position
+				gameState->player.y = by + bh;
+				py = by + bh;
+				// Make velocity from jump equal 0
+				gameState->player.dy = 0;
+			}
+			else if (py + ph > by && py < by && gameState->player.dy > 0) {
+				// Correct player's position
+				gameState->player.y = by - ph;
+				py = by - ph;
+				// Make velocity from jump equal 0
+				gameState->player.dy = 0;
+				gameState->player.onBrick = true;
 			}
 
 		}
 
-		// Check for collisions upper/under brick range
-		if (px + pw > bx && px < bx + bw) {
+		// Check for collisions with left/right side of the brick
+		if (py + ph > by && py < by + bh) {	
 
-			if (py < by && py + ph > by) {									// Top side of the brick
-				gameState->player.y = by - ph;
-				gameState->player.dy = 0.0f;
+			if (px < bx + bw && px + pw > bx + bw && gameState->player.dx < 0) {		// Right side of the brick 
+				gameState->player.x = bx + bw;
+				px = gameState->player.x;		
+				gameState->player.dx = 0;
+			}																
+			else if (px < bx && px + pw > bx && gameState->player.dx > 0) {				// Left side of the brick 
+				gameState->player.x = bx - pw;
+				px = gameState->player.x;
+				gameState->player.dx = 0;
 			}
-			else if (py < by + bh && py + ph > by + bh) {					// Bottom side of the brick
-				gameState->player.y = by + bh;
-				gameState->player.dy = 0.0f;
-			};
 
 		}
 
 	}
+
+}
+
+void process(GameState* gameState) {
+
+	Player* player = &gameState->player;
+
+	player->y += player->dy;
+	player->x += player->dx;
+
+	player->dy += GRAVITY;
+
+	collisionDetect(gameState);
 
 }
 
@@ -225,7 +284,7 @@ int main(int argc, char* argv[]) {
 	while (!done) {
 
 		processEvents(window, &done, &gameState);
-		collisionDetect(&gameState);
+		process(&gameState);
 		doRender(renderer, &gameState);
 
 		//SDL_Delay(10);
