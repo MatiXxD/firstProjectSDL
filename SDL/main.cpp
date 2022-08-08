@@ -15,10 +15,11 @@
 typedef struct{
 	float x, y;
 	float dy, dx;
-	short hp;
 	char* name;
-	bool onBrick;
 	int flyTime;
+	int frame;
+	bool onBrick;
+	SDL_RendererFlip flip;
 }Player;
 
 typedef struct {
@@ -48,6 +49,9 @@ typedef struct {
 	// Renderer
 	SDL_Renderer* renderer;
 
+	// Other
+	int time;
+
 }GameState;
 
 
@@ -67,7 +71,7 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 				break;
 			case SDLK_w:
 				if (gameState->player.onBrick) {
-					gameState->player.dy = -5.0f;
+					gameState->player.dy = -3.5f;
 					gameState->player.flyTime = 0;
 					gameState->player.onBrick = false;
 				}
@@ -91,19 +95,23 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 
 	// Walking
 	if (state[SDL_SCANCODE_D]) {
-		gameState->player.dx += 0.5f;
-		if (gameState->player.dx > 3.0f)
-			gameState->player.dx = 3.0f;
+		gameState->player.dx += 0.1f;
+		if (gameState->player.dx > 1.0f)
+			gameState->player.dx = 1.0f;
+		gameState->player.flip = SDL_FLIP_NONE;
 	}
 	else if (state[SDL_SCANCODE_A]) {
-		gameState->player.dx -= 0.5f;
-		if (gameState->player.dx < -3.0f)
-			gameState->player.dx = -3.0f;
+		gameState->player.dx -= 0.1f;
+		if (gameState->player.dx < -1.0f)
+			gameState->player.dx = -1.0f;
+		gameState->player.flip = SDL_FLIP_HORIZONTAL;
 	}
 	else {
-		gameState->player.dx *= 0.8f;
-		if (fabsf(gameState->player.dx) < 0.1f)
+		gameState->player.dx *= 0.9f;
+		if (fabsf(gameState->player.dx) < 0.1f) {
+			gameState->player.frame = 0;
 			gameState->player.dx = 0.0f;
+		}
 	}
 
 }
@@ -115,8 +123,8 @@ void doRender(SDL_Renderer* renderer, GameState* gameState) {
 
 	// Drawing player
 	SDL_Rect player = { gameState->player.x, gameState->player.y, 64, 80 };
-	SDL_RenderCopyEx(renderer, gameState->playerFrames[0], NULL,
-		&player, 0, NULL, SDL_FLIP_NONE);
+	SDL_RenderCopyEx(renderer, gameState->playerFrames[gameState->player.frame], NULL,
+		&player, 0, NULL, gameState->player.flip);
 
 	// Drawing enemies from array
 	/*for (int i = 0; i < ENEMIES_COUNT; i++) {
@@ -175,6 +183,11 @@ void loadGame(GameState* gameState) {
 	gameState->player.dx = 0;
 	gameState->player.onBrick = false;
 	gameState->player.flyTime = 0;
+	gameState->player.frame = 0;
+	gameState->player.flip = SDL_FLIP_NONE;
+
+	// Init game time
+	gameState->time = 0;
 
 	// Init enemies
 	for (int i = 0; i < ENEMIES_COUNT; i++) {
@@ -213,6 +226,7 @@ void collisionDetect(GameState* gameState) {
 				py = by + bh;
 				// Make velocity from jump equal 0
 				gameState->player.dy = 0;
+				gameState->player.onBrick = true;
 			}
 			else if (py + ph > by && py < by && gameState->player.dy > 0) {
 				// Correct player's position
@@ -249,12 +263,25 @@ void process(GameState* gameState) {
 
 	Player* player = &gameState->player;
 
+	// Player movement
 	player->y += player->dy;
 	player->x += player->dx;
-
 	player->dy += GRAVITY;
 
+	// Player animation
+	if (player->dx != 0 && player->onBrick) {
+		if (!(gameState->time % 50)) {
+			player->frame++;
+			if (player->frame == PLAYER_FRAMES)
+				player->frame = 0;
+		}
+	}
+
+	// Collision detection
 	collisionDetect(gameState);
+
+	// Changing time
+	gameState->time++;
 
 }
 
