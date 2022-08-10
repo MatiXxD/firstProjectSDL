@@ -2,57 +2,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
-#include <SDL.h>
-#include <SDL_image.h>
 
-#define PLAYER_FRAMES 6
-#define ENEMY_FRAMES 6
-#define ENEMIES_COUNT 20 
-#define BRICKS_COUNT 10
-
-#define GRAVITY 0.1f
-
-typedef struct{
-	float x, y;
-	float dy, dx;
-	char* name;
-	int flyTime;
-	int frame;
-	bool onBrick;
-	SDL_RendererFlip flip;
-}Player;
-
-typedef struct {
-	float x, y;
-}Enemy;
-
-typedef struct {
-	int x, y, h, w;
-}Brick;
-
-typedef struct {
-
-	// Players
-	Player player;
-	
-	// Enemies
-	Enemy enemies[ENEMIES_COUNT];
-
-	// Bricks
-	Brick bricks[BRICKS_COUNT];
-
-	// Textures 
-	SDL_Texture* playerFrames[PLAYER_FRAMES];
-	SDL_Texture* enemyFrames[ENEMY_FRAMES];
-	SDL_Texture* brickTexture;
-
-	// Renderer
-	SDL_Renderer* renderer;
-
-	// Other
-	int time;
-
-}GameState;
+#include "main.h"
+#include "status.h"
 
 
 void processEvents(SDL_Window* window, int* done, GameState* gameState) {
@@ -84,33 +36,35 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 		}
 	}
 
-	const Uint8* state = SDL_GetKeyboardState(NULL);
+	if (gameState->screenStatus == STATUS_GAME) {
+		const Uint8* state = SDL_GetKeyboardState(NULL);
 
-	// Extra jumping
-	if (state[SDL_SCANCODE_W] && gameState->player.flyTime < 50) {
-		gameState->player.dy -= 0.1f;
-		gameState->player.flyTime++;
-	}
-	
+		// Extra jumping
+		if (state[SDL_SCANCODE_W] && gameState->player.flyTime < 50) {
+			gameState->player.dy -= 0.1f;
+			gameState->player.flyTime++;
+		}
 
-	// Walking
-	if (state[SDL_SCANCODE_D]) {
-		gameState->player.dx += 0.1f;
-		if (gameState->player.dx > 1.0f)
-			gameState->player.dx = 1.0f;
-		gameState->player.flip = SDL_FLIP_NONE;
-	}
-	else if (state[SDL_SCANCODE_A]) {
-		gameState->player.dx -= 0.1f;
-		if (gameState->player.dx < -1.0f)
-			gameState->player.dx = -1.0f;
-		gameState->player.flip = SDL_FLIP_HORIZONTAL;
-	}
-	else {
-		gameState->player.dx *= 0.9f;
-		if (fabsf(gameState->player.dx) < 0.1f) {
-			gameState->player.frame = 0;
-			gameState->player.dx = 0.0f;
+
+		// Walking
+		if (state[SDL_SCANCODE_D]) {
+			gameState->player.dx += 0.1f;
+			if (gameState->player.dx > 1.0f)
+				gameState->player.dx = 1.0f;
+			gameState->player.flip = SDL_FLIP_NONE;
+		}
+		else if (state[SDL_SCANCODE_A]) {
+			gameState->player.dx -= 0.1f;
+			if (gameState->player.dx < -1.0f)
+				gameState->player.dx = -1.0f;
+			gameState->player.flip = SDL_FLIP_HORIZONTAL;
+		}
+		else {
+			gameState->player.dx *= 0.9f;
+			if (fabsf(gameState->player.dx) < 0.1f) {
+				gameState->player.frame = 0;
+				gameState->player.dx = 0.0f;
+			}
 		}
 	}
 
@@ -118,26 +72,33 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 
 void doRender(SDL_Renderer* renderer, GameState* gameState) {
 
-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-	SDL_RenderClear(renderer);
+	if (gameState->screenStatus == STATUS_LIVES) {
+		drawStatusLives(gameState);
+	}
+	else if (gameState->screenStatus == STATUS_GAME) {
 
-	// Drawing player
-	SDL_Rect player = { gameState->player.x, gameState->player.y, 64, 80 };
-	SDL_RenderCopyEx(renderer, gameState->playerFrames[gameState->player.frame], NULL,
-		&player, 0, NULL, gameState->player.flip);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+		SDL_RenderClear(renderer);
 
-	// Drawing enemies from array
-	/*for (int i = 0; i < ENEMIES_COUNT; i++) {
-		SDL_Rect enemy = { gameState->enemies[i].x, gameState->enemies[i].y, 64, 80 };
-		SDL_RenderCopyEx(renderer, gameState->enemyFrames[0], NULL,
-			&enemy, 0, NULL, SDL_FLIP_NONE);
-	}*/
+		// Drawing player
+		SDL_Rect player = { gameState->player.x, gameState->player.y, 64, 80 };
+		SDL_RenderCopyEx(renderer, gameState->playerFrames[gameState->player.frame], NULL,
+			&player, 0, NULL, gameState->player.flip);
 
-	// Drawing bricks
-	for (int i = 0; i < BRICKS_COUNT; i++) {
-		SDL_Rect brickRect = { gameState->bricks[i].x, gameState->bricks[i].y,
-			gameState->bricks[i].w, gameState->bricks[i].h };
-		SDL_RenderCopy(renderer, gameState->brickTexture, NULL, &brickRect);
+		// Drawing enemies from array
+		/*for (int i = 0; i < ENEMIES_COUNT; i++) {
+			SDL_Rect enemy = { gameState->enemies[i].x, gameState->enemies[i].y, 64, 80 };
+			SDL_RenderCopyEx(renderer, gameState->enemyFrames[0], NULL,
+				&enemy, 0, NULL, SDL_FLIP_NONE);
+		}*/
+
+		// Drawing bricks
+		for (int i = 0; i < BRICKS_COUNT; i++) {
+			SDL_Rect brickRect = { gameState->bricks[i].x, gameState->bricks[i].y,
+				gameState->bricks[i].w, gameState->bricks[i].h };
+			SDL_RenderCopy(renderer, gameState->brickTexture, NULL, &brickRect);
+		}
+
 	}
 
 	// Present what we draw
@@ -176,18 +137,31 @@ void loadGame(GameState* gameState) {
 		loadTexture(&gameState->enemyFrames[i], gameState->renderer, enemyFiles[i]);
 	loadTexture(&gameState->brickTexture, gameState->renderer, "Textures/Brick.png");
 
+	// Load fonts
+	gameState->font = TTF_OpenFont("Fonts/Game Of Squids.ttf", 48);
+	if (!gameState->font) {
+		printf("Cannot find font file!\n");
+		exit(1);
+	}
+	gameState->label = NULL;
+
 	// Init player
 	gameState->player.x = 0;
 	gameState->player.y = 920;
 	gameState->player.dy = 0;
 	gameState->player.dx = 0;
+	gameState->player.hp = 3;
 	gameState->player.onBrick = false;
 	gameState->player.flyTime = 0;
 	gameState->player.frame = 0;
 	gameState->player.flip = SDL_FLIP_NONE;
 
-	// Init game time
+	// Init status
+	initStatusLives(gameState);
+
+	// Init game properties
 	gameState->time = 0;
+	gameState->screenStatus = STATUS_LIVES;
 
 	// Init enemies
 	for (int i = 0; i < ENEMIES_COUNT; i++) {
@@ -263,22 +237,38 @@ void process(GameState* gameState) {
 
 	Player* player = &gameState->player;
 
-	// Player movement
-	player->y += player->dy;
-	player->x += player->dx;
-	player->dy += GRAVITY;
+	// Check if game started 
+	if (gameState->screenStatus == STATUS_GAME) {
+		// Player movement
+		player->y += player->dy;
+		player->x += player->dx;
+		player->dy += GRAVITY;
 
-	// Player animation
-	if (player->dx != 0 && player->onBrick) {
+		// Player animation
+		if (player->dx != 0 && player->onBrick) {
+			if (!(gameState->time % 50)) {
+				player->frame++;
+				if (player->frame == PLAYER_FRAMES)
+					player->frame = 0;
+			}
+		}
+
+		// Collision detection
+		collisionDetect(gameState);
+	}
+
+	else if (gameState->time > 240 * 5) {
+		gameState->screenStatus = STATUS_GAME;
+		shutdownStatusLives(gameState);
+	}
+
+	else if (gameState->screenStatus == STATUS_LIVES) {
 		if (!(gameState->time % 50)) {
 			player->frame++;
-			if (player->frame == PLAYER_FRAMES)
+			if (player->frame >= PLAYER_FRAMES)
 				player->frame = 0;
 		}
 	}
-
-	// Collision detection
-	collisionDetect(gameState);
 
 	// Changing time
 	gameState->time++;
@@ -288,6 +278,7 @@ void process(GameState* gameState) {
 
 int main(int argc, char* argv[]) {
 
+	
 	GameState gameState;
 	SDL_Window *window = NULL;
 	SDL_Renderer *renderer = NULL;
@@ -304,6 +295,7 @@ int main(int argc, char* argv[]) {
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	gameState.renderer = renderer;
 
+	TTF_Init();
 	loadGame(&gameState);
 
 	int done = 0;
@@ -323,7 +315,13 @@ int main(int argc, char* argv[]) {
 		SDL_DestroyTexture(gameState.playerFrames[i]);
 	for (int i = 0; i < ENEMY_FRAMES; i++)
 		SDL_DestroyTexture(gameState.enemyFrames[i]);
+	if (gameState.label != NULL)
+		SDL_DestroyTexture(gameState.label);
+	// Close fonts
+	TTF_CloseFont(gameState.font);
 
+
+	TTF_Quit();
 	SDL_DestroyWindow(window);
 	SDL_DestroyRenderer(renderer);
 	SDL_Quit();
