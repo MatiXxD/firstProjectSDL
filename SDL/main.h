@@ -8,9 +8,8 @@
 
 
 #define PLAYER_FRAMES 6
-#define ENEMY_FRAMES 6
-#define ENEMIES_COUNT 20 
-#define BRICKS_COUNT 10
+#define ENEMIES_COUNT 100
+#define BRICKS_COUNT 300
 
 #define GRAVITY 0.1f
 
@@ -28,6 +27,7 @@ typedef struct player{
 	int flyTime;
 	int frame;
 	bool onBrick;
+	bool isDead;
 	SDL_RendererFlip flip;
 }Player;
 
@@ -41,6 +41,9 @@ typedef struct brick{
 
 typedef struct gameState{
 
+	// Screen scrolling
+	float scrollX;
+
 	// Players
 	Player player;
 
@@ -52,7 +55,8 @@ typedef struct gameState{
 
 	// Textures 
 	SDL_Texture* playerFrames[PLAYER_FRAMES];
-	SDL_Texture* enemyFrames[ENEMY_FRAMES];
+	SDL_Texture* enemyFrames;
+	SDL_Texture* deadFrames;
 	SDL_Texture* brickTexture;
 	SDL_Texture* label;
 
@@ -68,6 +72,7 @@ typedef struct gameState{
 
 	// Other
 	int time;
+	int deathTime;
 	int screenStatus;
 
 }GameState;

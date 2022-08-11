@@ -7,6 +7,14 @@
 #include "status.h"
 
 
+bool checkCollision(float x1, float y1, float x2, float y2, float w1, float h1, float w2, float h2) {
+
+	return (!((x1 > (x2 + w2)) || (x2 > (x1 + w1)) || (y1 > (y2 + h2)) || (y2 > (y1 + h1))));
+
+}
+
+
+
 void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 
 	SDL_Event event;
@@ -81,20 +89,24 @@ void doRender(SDL_Renderer* renderer, GameState* gameState) {
 		SDL_RenderClear(renderer);
 
 		// Drawing player
-		SDL_Rect player = { gameState->player.x, gameState->player.y, 64, 80 };
-		SDL_RenderCopyEx(renderer, gameState->playerFrames[gameState->player.frame], NULL,
-			&player, 0, NULL, gameState->player.flip);
+		SDL_Rect player = { gameState->scrollX + gameState->player.x, gameState->player.y, 64, 80 };
+		if(!gameState->player.isDead)
+			SDL_RenderCopyEx(renderer, gameState->playerFrames[gameState->player.frame], NULL,
+				&player, 0, NULL, gameState->player.flip);
+		else
+			SDL_RenderCopyEx(renderer, gameState->deadFrames, NULL,
+				&player, 0, NULL, SDL_FLIP_NONE);
 
 		// Drawing enemies from array
-		/*for (int i = 0; i < ENEMIES_COUNT; i++) {
-			SDL_Rect enemy = { gameState->enemies[i].x, gameState->enemies[i].y, 64, 80 };
-			SDL_RenderCopyEx(renderer, gameState->enemyFrames[0], NULL,
+		for (int i = 0; i < ENEMIES_COUNT; i++) {
+			SDL_Rect enemy = { gameState->scrollX + gameState->enemies[i].x, gameState->enemies[i].y, 64, 80 };
+			SDL_RenderCopyEx(renderer, gameState->enemyFrames, NULL,
 				&enemy, 0, NULL, SDL_FLIP_NONE);
-		}*/
+		}
 
 		// Drawing bricks
 		for (int i = 0; i < BRICKS_COUNT; i++) {
-			SDL_Rect brickRect = { gameState->bricks[i].x, gameState->bricks[i].y,
+			SDL_Rect brickRect = { gameState->scrollX + gameState->bricks[i].x, gameState->bricks[i].y,
 				gameState->bricks[i].w, gameState->bricks[i].h };
 			SDL_RenderCopy(renderer, gameState->brickTexture, NULL, &brickRect);
 		}
@@ -126,16 +138,13 @@ void loadGame(GameState* gameState) {
 	const char* playerFiles[PLAYER_FRAMES] = {"Textures/Player/Frame1.png", "Textures/Player/Frame2.png",
 		"Textures/Player/Frame3.png", "Textures/Player/Frame4.png", "Textures/Player/Frame5.png",
 		"Textures/Player/Frame6.png" };
-	const char* enemyFiles[ENEMY_FRAMES] = { "Textures/Enemy/Frame1.png", "Textures/Enemy/Frame2.png",
-		"Textures/Enemy/Frame3.png", "Textures/Enemy/Frame4.png", "Textures/Enemy/Frame5.png",
-		"Textures/Enemy/Frame6.png" };
 	
 	// Load textures
-	for(int i = 0 ; i < PLAYER_FRAMES ; i++)												// Player frames
+	for(int i = 0 ; i < PLAYER_FRAMES ; i++)													// Player frames
 		loadTexture(&gameState->playerFrames[i], gameState->renderer, playerFiles[i]);
-	for (int i = 0; i < PLAYER_FRAMES; i++)													// Enemy frames
-		loadTexture(&gameState->enemyFrames[i], gameState->renderer, enemyFiles[i]);
-	loadTexture(&gameState->brickTexture, gameState->renderer, "Textures/Brick.png");
+	loadTexture(&gameState->deadFrames, gameState->renderer, "Textures/Player/Dead.png");		// Dead texture
+	loadTexture(&gameState->enemyFrames, gameState->renderer, "Textures/Enemy/Frame1.png");		// Enemy texture
+	loadTexture(&gameState->brickTexture, gameState->renderer, "Textures/Brick.png");			// Brick texture
 
 	// Load fonts
 	gameState->font = TTF_OpenFont("Fonts/Game Of Squids.ttf", 48);
@@ -152,6 +161,7 @@ void loadGame(GameState* gameState) {
 	gameState->player.dx = 0;
 	gameState->player.hp = 3;
 	gameState->player.onBrick = false;
+	gameState->player.isDead = false;
 	gameState->player.flyTime = 0;
 	gameState->player.frame = 0;
 	gameState->player.flip = SDL_FLIP_NONE;
@@ -160,30 +170,74 @@ void loadGame(GameState* gameState) {
 	initStatusLives(gameState);
 
 	// Init game properties
+	gameState->scrollX = 0.0f;
 	gameState->time = 0;
+	gameState->deathTime = 0;
 	gameState->screenStatus = STATUS_LIVES;
+	
+	// Init bricks
+	// Start platform
+	gameState->bricks[0].x = 0;
+	gameState->bricks[0].y = 1080-64;
+	gameState->bricks[0].w = 256;
+	gameState->bricks[0].h = 64;
+
+	// First level of bricks
+	for (int i = 1; i < BRICKS_COUNT; i++) {
+		gameState->bricks[i].w = 256;
+		gameState->bricks[i].h = 64;
+		gameState->bricks[i].x = 350 * i;
+		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+	}
+
+	// Second level of bricks
+	for (int i = 100; i < BRICKS_COUNT; i++) {
+		gameState->bricks[i].w = 256;
+		gameState->bricks[i].h = 64;
+		gameState->bricks[i].x = 350 * (i-99);
+		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+		while(abs(gameState->bricks[i].y - gameState->bricks[i-99].y) < 200)
+			gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+	}
+
+	// Third level of bricks
+	for (int i = 200; i < BRICKS_COUNT; i++) {
+		gameState->bricks[i].w = 256;
+		gameState->bricks[i].h = 64;
+		gameState->bricks[i].x = 350 * (i - 199);
+		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+		while (abs(gameState->bricks[i].y - gameState->bricks[i - 99].y) < 200 ||
+				abs(gameState->bricks[i].y - gameState->bricks[i - 199].y) < 200)
+			gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+	}
 
 	// Init enemies
 	for (int i = 0; i < ENEMIES_COUNT; i++) {
-		gameState->enemies[i].x = rand() % 1920;
-		gameState->enemies[i].y = rand() % 1080;
+		gameState->enemies[i].x = i * 350 + rand() % 200;
+		gameState->enemies[i].y = rand() % (1080 - 80);
+		while (checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i].x, gameState->bricks[i].y, 64, 80, 256, 64) ||
+			checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i+99].x, gameState->bricks[i+99].y, 64, 80, 256, 64) ||
+			checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i+199].x, gameState->bricks[i+199].y, 64, 80, 256, 64)) {
+			gameState->enemies[i].x = i * 350 + rand() % 200;
+			gameState->enemies[i].y = rand() % (1080 - 80);
+		}
 	}
-	
-	// Init bricks
-	for (int i = 0; i < BRICKS_COUNT; i++) {
-		gameState->bricks[i].w = 256;
-		gameState->bricks[i].h = 64;
-		gameState->bricks[i].x = 256 * i;
-		gameState->bricks[i].y = 1080 - 64;
-	}
-	gameState->bricks[BRICKS_COUNT - 1].x = 350;
-	gameState->bricks[BRICKS_COUNT - 1].y = 700;
 
 }
 
 void collisionDetect(GameState* gameState) {
 
-	// Should add corners check  
+	// Collision with enemies
+	for (int i = 0; i < ENEMIES_COUNT; i++) {
+
+		if (checkCollision(gameState->player.x, gameState->player.y, gameState->enemies[i].x,
+			gameState->enemies[i].y, 64, 80, 64, 80)) {
+			gameState->player.isDead = true;
+		}
+
+	}
+
+	// Collision with bricks
 	for (int i = 0; i < BRICKS_COUNT; i++) {
 
 		float pw = 64, ph = 80;
@@ -239,29 +293,33 @@ void process(GameState* gameState) {
 
 	// Check if game started 
 	if (gameState->screenStatus == STATUS_GAME) {
-		// Player movement
-		player->y += player->dy;
-		player->x += player->dx;
-		player->dy += GRAVITY;
+		if (!gameState->player.isDead) {
+			// Player movement
+			player->y += player->dy;
+			player->x += player->dx;
+			player->dy += GRAVITY;
 
-		// Player animation
-		if (player->dx != 0 && player->onBrick) {
-			if (!(gameState->time % 50)) {
-				player->frame++;
-				if (player->frame == PLAYER_FRAMES)
-					player->frame = 0;
+			// Player animation
+			if (player->dx != 0 && player->onBrick) {
+				if (!(gameState->time % 50)) {
+					player->frame++;
+					if (player->frame == PLAYER_FRAMES)
+						player->frame = 0;
+				}
 			}
-		}
 
-		// Collision detection
-		collisionDetect(gameState);
+			// Collision detection
+			collisionDetect(gameState);
+		}
 	}
 
+	// Start game
 	else if (gameState->time > 240 * 5) {
 		gameState->screenStatus = STATUS_GAME;
 		shutdownStatusLives(gameState);
 	}
 
+	// Animation at start display  
 	else if (gameState->screenStatus == STATUS_LIVES) {
 		if (!(gameState->time % 50)) {
 			player->frame++;
@@ -272,6 +330,11 @@ void process(GameState* gameState) {
 
 	// Changing time
 	gameState->time++;
+
+	// Scrolling the screen
+	gameState->scrollX = -player->x + 1920 / 2;
+	if (gameState->scrollX > 0)							// Not scrolling at the start 
+		gameState->scrollX = 0.0f;
 
 }
 
@@ -313,8 +376,9 @@ int main(int argc, char* argv[]) {
 	// Destroying textures
 	for (int i = 0; i < PLAYER_FRAMES; i++) 
 		SDL_DestroyTexture(gameState.playerFrames[i]);
-	for (int i = 0; i < ENEMY_FRAMES; i++)
-		SDL_DestroyTexture(gameState.enemyFrames[i]);
+	SDL_DestroyTexture(gameState.deadFrames);
+	SDL_DestroyTexture(gameState.enemyFrames);
+	SDL_DestroyTexture(gameState.brickTexture);
 	if (gameState.label != NULL)
 		SDL_DestroyTexture(gameState.label);
 	// Close fonts
