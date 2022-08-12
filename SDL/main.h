@@ -22,8 +22,7 @@
 typedef struct player{
 	float x, y;
 	float dy, dx;
-	char* name;
-	unsigned hp;
+	short hp;
 	int flyTime;
 	int frame;
 	bool onBrick;
@@ -60,9 +59,8 @@ typedef struct gameState{
 	SDL_Texture* brickTexture;
 	SDL_Texture* label;
 
-	// Images properties
-	int labelWidth;
-	int labelHeight;
+	// Surfaces
+	SDL_Surface* textSurface;
 
 	// Fonts
 	TTF_Font *font;

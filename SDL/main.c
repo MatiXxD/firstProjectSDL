@@ -133,6 +133,79 @@ void loadTexture(SDL_Texture** texture, SDL_Renderer* renderer, const char* file
 
 }
 
+void initGame(GameState* gameState, short lives) {
+
+	// Init player
+	gameState->player.x = 0;
+	gameState->player.y = 920;
+	gameState->player.dy = 0;
+	gameState->player.dx = 0;
+	gameState->player.hp = lives;
+	gameState->player.onBrick = false;
+	gameState->player.isDead = false;
+	gameState->player.flyTime = 0;
+	gameState->player.frame = 0;
+	gameState->player.flip = SDL_FLIP_NONE;
+
+	// Init status
+	initStatusLives(gameState);
+
+	// Init game properties
+	gameState->scrollX = 0.0f;
+	gameState->time = 0;
+	gameState->deathTime = -1;
+	gameState->screenStatus = STATUS_LIVES;
+
+	// Init bricks
+	// Start platform
+	gameState->bricks[0].x = 0;
+	gameState->bricks[0].y = 1080 - 64;
+	gameState->bricks[0].w = 256;
+	gameState->bricks[0].h = 64;
+
+	// First level of bricks
+	for (int i = 1; i < BRICKS_COUNT; i++) {
+		gameState->bricks[i].w = 256;
+		gameState->bricks[i].h = 64;
+		gameState->bricks[i].x = 350 * i;
+		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+	}
+
+	// Second level of bricks
+	for (int i = 100; i < BRICKS_COUNT; i++) {
+		gameState->bricks[i].w = 256;
+		gameState->bricks[i].h = 64;
+		gameState->bricks[i].x = 350 * (i - 99);
+		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+		while (abs(gameState->bricks[i].y - gameState->bricks[i - 99].y) < 200)
+			gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+	}
+
+	// Third level of bricks
+	for (int i = 200; i < BRICKS_COUNT; i++) {
+		gameState->bricks[i].w = 256;
+		gameState->bricks[i].h = 64;
+		gameState->bricks[i].x = 350 * (i - 199);
+		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+		while (abs(gameState->bricks[i].y - gameState->bricks[i - 99].y) < 200 ||
+			abs(gameState->bricks[i].y - gameState->bricks[i - 199].y) < 200)
+			gameState->bricks[i].y = 1080 - 64 - rand() % 800;
+	}
+
+	// Init enemies
+	for (int i = 0; i < ENEMIES_COUNT; i++) {
+		gameState->enemies[i].x = i * 350 + rand() % 200;
+		gameState->enemies[i].y = rand() % (1080 - 80);
+		while (checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i].x, gameState->bricks[i].y, 64, 80, 256, 64) ||
+			checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i + 99].x, gameState->bricks[i + 99].y, 64, 80, 256, 64) ||
+			checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i + 199].x, gameState->bricks[i + 199].y, 64, 80, 256, 64)) {
+			gameState->enemies[i].x = i * 350 + rand() % 200;
+			gameState->enemies[i].y = rand() % (1080 - 80);
+		}
+	}
+
+}
+
 void loadGame(GameState* gameState) {
 
 	const char* playerFiles[PLAYER_FRAMES] = {"Textures/Player/Frame1.png", "Textures/Player/Frame2.png",
@@ -153,79 +226,18 @@ void loadGame(GameState* gameState) {
 		exit(1);
 	}
 	gameState->label = NULL;
+	gameState->textSurface = NULL;
 
-	// Init player
-	gameState->player.x = 0;
-	gameState->player.y = 920;
-	gameState->player.dy = 0;
-	gameState->player.dx = 0;
-	gameState->player.hp = 3;
-	gameState->player.onBrick = false;
-	gameState->player.isDead = false;
-	gameState->player.flyTime = 0;
-	gameState->player.frame = 0;
-	gameState->player.flip = SDL_FLIP_NONE;
-
-	// Init status
-	initStatusLives(gameState);
-
-	// Init game properties
-	gameState->scrollX = 0.0f;
-	gameState->time = 0;
-	gameState->deathTime = 0;
-	gameState->screenStatus = STATUS_LIVES;
-	
-	// Init bricks
-	// Start platform
-	gameState->bricks[0].x = 0;
-	gameState->bricks[0].y = 1080-64;
-	gameState->bricks[0].w = 256;
-	gameState->bricks[0].h = 64;
-
-	// First level of bricks
-	for (int i = 1; i < BRICKS_COUNT; i++) {
-		gameState->bricks[i].w = 256;
-		gameState->bricks[i].h = 64;
-		gameState->bricks[i].x = 350 * i;
-		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
-	}
-
-	// Second level of bricks
-	for (int i = 100; i < BRICKS_COUNT; i++) {
-		gameState->bricks[i].w = 256;
-		gameState->bricks[i].h = 64;
-		gameState->bricks[i].x = 350 * (i-99);
-		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
-		while(abs(gameState->bricks[i].y - gameState->bricks[i-99].y) < 200)
-			gameState->bricks[i].y = 1080 - 64 - rand() % 800;
-	}
-
-	// Third level of bricks
-	for (int i = 200; i < BRICKS_COUNT; i++) {
-		gameState->bricks[i].w = 256;
-		gameState->bricks[i].h = 64;
-		gameState->bricks[i].x = 350 * (i - 199);
-		gameState->bricks[i].y = 1080 - 64 - rand() % 800;
-		while (abs(gameState->bricks[i].y - gameState->bricks[i - 99].y) < 200 ||
-				abs(gameState->bricks[i].y - gameState->bricks[i - 199].y) < 200)
-			gameState->bricks[i].y = 1080 - 64 - rand() % 800;
-	}
-
-	// Init enemies
-	for (int i = 0; i < ENEMIES_COUNT; i++) {
-		gameState->enemies[i].x = i * 350 + rand() % 200;
-		gameState->enemies[i].y = rand() % (1080 - 80);
-		while (checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i].x, gameState->bricks[i].y, 64, 80, 256, 64) ||
-			checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i+99].x, gameState->bricks[i+99].y, 64, 80, 256, 64) ||
-			checkCollision(gameState->enemies[i].x, gameState->enemies[i].y, gameState->bricks[i+199].x, gameState->bricks[i+199].y, 64, 80, 256, 64)) {
-			gameState->enemies[i].x = i * 350 + rand() % 200;
-			gameState->enemies[i].y = rand() % (1080 - 80);
-		}
-	}
+	// Initialize game's values
+	initGame(gameState, 3);
 
 }
 
 void collisionDetect(GameState* gameState) {
+
+	// Check for falling 
+	if (gameState->player.y > 1080)
+		gameState->player.isDead = true;
 
 	// Collision with enemies
 	for (int i = 0; i < ENEMIES_COUNT; i++) {
@@ -293,6 +305,7 @@ void process(GameState* gameState) {
 
 	// Check if game started 
 	if (gameState->screenStatus == STATUS_GAME) {
+
 		if (!gameState->player.isDead) {
 			// Player movement
 			player->y += player->dy;
@@ -311,13 +324,23 @@ void process(GameState* gameState) {
 			// Collision detection
 			collisionDetect(gameState);
 		}
+
+		else if (gameState->deathTime > 0) {
+			gameState->deathTime--;
+			if (gameState->deathTime <= 0) {
+				unsigned temp = gameState->player.hp - 1;
+				initGame(gameState, temp);
+			}
+		}
+
+		else if (gameState->player.isDead && gameState->deathTime < 0)
+			gameState->deathTime = 240;
+
 	}
 
 	// Start game
-	else if (gameState->time > 240 * 5) {
+	else if (gameState->time > 240 * 5) 
 		gameState->screenStatus = STATUS_GAME;
-		shutdownStatusLives(gameState);
-	}
 
 	// Animation at start display  
 	else if (gameState->screenStatus == STATUS_LIVES) {
@@ -379,13 +402,14 @@ int main(int argc, char* argv[]) {
 	SDL_DestroyTexture(gameState.deadFrames);
 	SDL_DestroyTexture(gameState.enemyFrames);
 	SDL_DestroyTexture(gameState.brickTexture);
-	if (gameState.label != NULL)
-		SDL_DestroyTexture(gameState.label);
+
+	// Close things connected with lives screen
+	shutdownStatusLives(&gameState);
+
 	// Close fonts
 	TTF_CloseFont(gameState.font);
-
-
 	TTF_Quit();
+
 	SDL_DestroyWindow(window);
 	SDL_DestroyRenderer(renderer);
 	SDL_Quit();

@@ -8,13 +8,10 @@ void initStatusLives(GameState* gameState) {
 	char str[64];
 	SDL_Color color = { 255, 255, 255, 255 };
 
-	sprintf(str, "x %u", gameState->player.hp); 
+	sprintf(str, "x %hd", gameState->player.hp); 
 
-	SDL_Surface *temp = TTF_RenderText_Blended(gameState->font, str, color);
-	gameState->labelWidth = temp->w;
-	gameState->labelHeight = temp->h;
-	gameState->label = SDL_CreateTextureFromSurface(gameState->renderer, temp);
-	SDL_FreeSurface(temp);
+	gameState->textSurface = TTF_RenderText_Blended(gameState->font, str, color);
+	gameState->label = SDL_CreateTextureFromSurface(gameState->renderer, gameState->textSurface);
 
 }
 
@@ -27,14 +24,18 @@ void drawStatusLives(GameState* gameState) {
 	SDL_RenderCopyEx(gameState->renderer, gameState->playerFrames[gameState->player.frame], NULL,
 		&player, 0, NULL, gameState->player.flip);
 
-	SDL_Rect textRect = { 850, 500, gameState->labelWidth, gameState->labelHeight};
+	SDL_Rect textRect = { 850, 500, gameState->textSurface->w, gameState->textSurface ->h};
 	SDL_RenderCopy(gameState->renderer, gameState->label, NULL, &textRect);
 
 }
 
 void shutdownStatusLives(GameState* gameState) {
 
-	SDL_DestroyTexture(gameState->label);
+	if(gameState->textSurface != NULL)
+		SDL_FreeSurface(gameState->textSurface);
+	if(gameState->label != NULL)
+		SDL_DestroyTexture(gameState->label);
+	gameState->textSurface = NULL;
 	gameState->label = NULL;
 
 }
