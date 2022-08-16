@@ -6,7 +6,10 @@
 
 // Functions prototypes
 void initStatusLives(GameState* gameState);
+void initGameoverScreen(GameState* gameState);
+void initVictoryScreen(GameState* gameState);
 void drawStatusLives(GameState* gameState);
+void drawFinalScreen(GameState* gameState);
 void shutdownStatusLives(GameState* gameState);
 
 

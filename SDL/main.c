@@ -76,6 +76,8 @@ void processEvents(SDL_Window* window, int* done, GameState* gameState) {
 		}
 	}
 
+
+
 }
 
 void doRender(SDL_Renderer* renderer, GameState* gameState) {
@@ -245,6 +247,7 @@ void collisionDetect(GameState* gameState) {
 		if (checkCollision(gameState->player.x, gameState->player.y, gameState->enemies[i].x,
 			gameState->enemies[i].y, 64, 80, 64, 80)) {
 			gameState->player.isDead = true;
+			break;
 		}
 
 	}
@@ -299,7 +302,7 @@ void collisionDetect(GameState* gameState) {
 
 }
 
-void process(GameState* gameState) {
+void process(GameState* gameState, int* done) {
 
 	Player* player = &gameState->player;
 
@@ -328,8 +331,12 @@ void process(GameState* gameState) {
 		else if (gameState->deathTime > 0) {
 			gameState->deathTime--;
 			if (gameState->deathTime <= 0) {
-				unsigned temp = gameState->player.hp - 1;
-				initGame(gameState, temp);
+				short temp = gameState->player.hp - 1;
+				if (temp >= 0) 
+					initGame(gameState, temp);
+				else
+					gameState->screenStatus = STATUS_GAMEOVER;
+				gameState->time = 0;
 			}
 		}
 
@@ -339,7 +346,8 @@ void process(GameState* gameState) {
 	}
 
 	// Start game
-	else if (gameState->time > 240 * 5) 
+	else if (gameState->time > 240 * 5 && gameState->screenStatus != STATUS_GAMEOVER 
+		&& gameState->screenStatus != STATUS_VICTORY)
 		gameState->screenStatus = STATUS_GAME;
 
 	// Animation at start display  
@@ -351,6 +359,24 @@ void process(GameState* gameState) {
 		}
 	}
 
+	// Display gameover screen
+	else if (gameState->screenStatus == STATUS_GAMEOVER) {
+		initGameoverScreen(gameState);
+		drawFinalScreen(gameState);
+		if(gameState->time > 240 * 5)
+			*done = 1;
+	}
+
+	// Display victory screen
+	else if (gameState->screenStatus == STATUS_VICTORY) {
+		initVictoryScreen(gameState);
+		drawFinalScreen(gameState);
+		if (gameState->time > 240 * 5)
+			*done = 1;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+
 	// Changing time
 	gameState->time++;
 
@@ -358,6 +384,12 @@ void process(GameState* gameState) {
 	gameState->scrollX = -player->x + 1920 / 2;
 	if (gameState->scrollX > 0)							// Not scrolling at the start 
 		gameState->scrollX = 0.0f;
+
+	// Check for win
+	if (gameState->player.x > WIN_VALUE && gameState->screenStatus != STATUS_VICTORY) {
+		gameState->screenStatus = STATUS_VICTORY;
+		gameState->time = 0;
+	}
 
 }
 
@@ -389,7 +421,7 @@ int main(int argc, char* argv[]) {
 	while (!done) {
 
 		processEvents(window, &done, &gameState);
-		process(&gameState);
+		process(&gameState, &done);
 		doRender(renderer, &gameState);
 
 		//SDL_Delay(10);

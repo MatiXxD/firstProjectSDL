@@ -12,19 +12,21 @@
 #define BRICKS_COUNT 300
 
 #define GRAVITY 0.1f
+#define WIN_VALUE 20000
 
 #define STATUS_LIVES 0
 #define STATUS_GAME 1
 #define STATUS_GAMEOVER 2
+#define STATUS_VICTORY 3
 
 
 // Structs definitions
 typedef struct player{
 	float x, y;
 	float dy, dx;
-	short hp;
 	int flyTime;
 	int frame;
+	short hp;
 	bool onBrick;
 	bool isDead;
 	SDL_RendererFlip flip;
